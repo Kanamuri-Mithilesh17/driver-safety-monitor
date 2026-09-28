@@ -998,3 +998,269 @@ def main():
         print(
             "ERROR: Could not create output video."
         )
+        cap.release()
+
+        return
+
+    # --------------------------------------------------------
+    # CSV
+    # --------------------------------------------------------
+
+    csv_file = open(
+        OUTPUT_CSV,
+        "w",
+        newline="",
+        encoding="utf-8"
+    )
+
+    csv_writer = csv.DictWriter(
+        csv_file,
+        fieldnames=[
+            "event",
+            "frame",
+            "video_time_s",
+            "direction",
+            "left_changes",
+            "right_changes",
+            "total_changes"
+        ]
+    )
+
+    csv_writer.writeheader()
+
+    # --------------------------------------------------------
+    # Lane tracker
+    # --------------------------------------------------------
+
+    tracker = LaneChangeTracker(
+        fps
+    )
+
+    cam_x = (
+        width
+        * CAMERA_X_FRAC
+    )
+
+    banner = None
+
+    banner_left = 0
+
+    frame_idx = 0
+
+    vehicles = []
+
+    print(
+        "Processing video..."
+    )
+
+    try:
+
+        while True:
+
+            ok, frame = cap.read()
+
+            if not ok:
+                break
+
+            # =================================================
+            # LANE DETECTION
+            # =================================================
+
+            left, right = detect_lane(
+                frame
+            )
+
+            geometry = lane_geometry(
+                left,
+                right,
+                width
+            )
+
+            # =================================================
+            # LANE CHANGE DETECTION
+            # =================================================
+
+            event = tracker.update(
+                frame_idx,
+                geometry,
+                cam_x
+            )
+
+            if event:
+
+                csv_writer.writerow(
+                    event
+                )
+
+                csv_file.flush()
+
+                banner = (
+                    "LANE CHANGE: "
+                    + event["direction"]
+                )
+
+                banner_left = int(
+                    fps * BANNER_S
+                )
+
+                print(
+                    f"[LANE CHANGE] "
+                    f"{event['direction']} "
+                    f"at "
+                    f"{event['video_time_s']}s "
+                    f"| Total: "
+                    f"{event['total_changes']}"
+                )
+
+            # =================================================
+            # VEHICLE DETECTION
+            # =================================================
+
+            if (
+                frame_idx
+                % YOLO_INTERVAL
+                == 0
+            ):
+
+                vehicles = (
+                    vehicle_detector.detect(
+                        frame
+                    )
+                )
+
+            # =================================================
+            # BANNER TIMER
+            # =================================================
+
+            if banner_left > 0:
+
+                banner_left -= 1
+
+            else:
+
+                banner = None
+
+            # =================================================
+            # DRAW LANES
+            # =================================================
+
+            draw_side(
+                frame,
+                left,
+                GREEN
+            )
+
+            draw_side(
+                frame,
+                right,
+                GREEN
+            )
+
+            # =================================================
+            # DRAW VEHICLES
+            # =================================================
+
+            draw_vehicles(
+                frame,
+                vehicles
+            )
+
+            # =================================================
+            # DRAW INFORMATION
+            # =================================================
+
+            draw_overlay(
+                frame,
+                geometry,
+                tracker,
+                frame_idx / fps,
+                banner,
+                cam_x,
+                vehicles
+            )
+
+            # =================================================
+            # WRITE OUTPUT
+            # =================================================
+
+            writer.write(
+                frame
+            )
+
+            cv2.imshow(
+                "Driver Safety Monitor",
+                frame
+            )
+
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord("q"):
+                break
+
+            frame_idx += 1
+
+    finally:
+
+        cap.release()
+
+        writer.release()
+
+        csv_file.close()
+
+        cv2.destroyAllWindows()
+
+    # ========================================================
+    # FINAL RESULTS
+    # ========================================================
+
+    print()
+    print(
+        "=============================="
+    )
+
+    print(
+        "DRIVER SAFETY MONITOR COMPLETE"
+    )
+
+    print(
+        "=============================="
+    )
+
+    print(
+        f"Left lane changes  : "
+        f"{tracker.left_changes}"
+    )
+
+    print(
+        f"Right lane changes : "
+        f"{tracker.right_changes}"
+    )
+
+    print(
+        f"Total lane changes : "
+        f"{tracker.total_changes}"
+    )
+
+    print(
+        "Output video:"
+    )
+
+    print(
+        OUTPUT_VIDEO.resolve()
+    )
+
+    print(
+        "CSV:"
+    )
+
+    print(
+        OUTPUT_CSV.resolve()
+    )
+
+
+# ============================================================
+# RUN
+# ============================================================
+
+if __name__ == "__main__":
+    main()
