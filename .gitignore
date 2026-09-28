@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Input/output media
+*.mp4
+*.avi
+*.mov
+*.mkv
+output/*
+!output/.gitkeep
+
+# YOLO model weights
+*.pt
+*.onnx
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
